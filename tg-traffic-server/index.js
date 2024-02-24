@@ -1,5 +1,5 @@
 const express = require("express");
-const { TelegramClient } = require("telegram");
+const { Api, TelegramClient } = require("telegram");
 const { StoreSession } = require("telegram/sessions");
 const fs = require("fs");
 const cors = require("cors");
@@ -12,32 +12,41 @@ const session = new StoreSession("my_session");
 app.use(express.json());
 app.use(cors());
 
-app.post("/api/sendCode", async (req, res) => {
-  try {
-    const { apiId, apiHash, phoneNumber } = req.body;
+let phoneCodeHash;
 
+app.post("/api/onboarding", async (req, res) => {
+  const { apiId, apiHash, phoneNumber } = req.body;
+
+  try {
     const client = new TelegramClient(session, apiId, apiHash, {
       connectionRetries: 5,
     });
 
-    await client.start({
-      phoneNumber: phoneNumber,
-      phoneCode: async () =>
-        await askQuestion("Please enter the code you received: "),
-      onError: (err) => console.log(err),
-    });
+    await client.connect();
+
+    const result = await client.sendCode(
+      {
+        apiId: apiId,
+        apiHash: apiHash,
+      },
+      phoneNumber
+    );
+
+    phoneCodeHash = result.phoneCodeHash;
+
     res.json({
-      message: 'Code received. Please enter the code and press "Make CSV".',
+      isCodeSent: true,
+      message: `Code sent. Enter the code and press "Send code" button.`,
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).send("Error occurred");
+    console.error(error.message);
+    res.status(500).json({ isCodeSent: false, message: "Error sending code!" });
   }
 });
 
 app.post("/api/getGroups", async (req, res) => {
   try {
-    const { apiId, apiHash } = req.body;
+    const { apiId, apiHash, phoneNumber, code } = req.body;
     const client = new TelegramClient(
       new StoreSession("my_session"),
       apiId,
@@ -49,12 +58,25 @@ app.post("/api/getGroups", async (req, res) => {
 
     await client.connect();
 
+    await client.invoke(
+      new Api.auth.SignIn({
+        phoneNumber: phoneNumber,
+        phoneCodeHash,
+        phoneCode: code,
+      })
+    );
+
     const chats = await client.getDialogs();
     const groups = chats.filter((chat) => chat.isGroup);
     const groupTitles = groups.map((group) => group.title);
     const groupIds = groups.map((group) => group.id);
 
-    res.json({ groupTitles: groupTitles, groupIds: groupIds });
+    res.json({
+      isOnboarded: true,
+      groupTitles: groupTitles,
+      groupIds: groupIds,
+      message: "Choose a group to make a members list.",
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Internal Server Error" });

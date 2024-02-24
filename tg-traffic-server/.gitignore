@@ -3,6 +3,8 @@
 
 ### Node ###
 # Logs
+
+my_session
 logs
 *.log
 npm-debug.log*

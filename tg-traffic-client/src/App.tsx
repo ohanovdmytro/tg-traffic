@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import axios from "axios";
 import {
   Box,
@@ -13,38 +13,47 @@ function App() {
   const [apiId, setApiId] = useState("");
   const [apiHash, setApiHash] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
-  // const [password, setPassword] = useState("");
+
   const [message, setMessage] = useState("");
+  const [codeStatus, setCodeStatus] = useState(false);
+  const [code, setCode] = useState("");
+
   const [groupTitles, setGroupTitles] = useState([]);
   const [groupIds, setGroupIds] = useState([]);
-  const [code, setCode] = useState("");
+
   const [csvContent, setCsvContent] = useState("");
   const [selectedGroupId, setSelectedGroupId] = useState(0);
 
   const handleSendCode = async () => {
     try {
-      const response = await axios.post("http://localhost:3000/api/sendCode", {
-        apiId: Number(apiId),
-        apiHash: apiHash,
-        phoneNumber: phoneNumber,
-      });
+      const response = await axios.post(
+        "http://localhost:3000/api/onboarding",
+        {
+          apiId: Number(apiId),
+          apiHash: apiHash,
+          phoneNumber: phoneNumber,
+        }
+      );
       setMessage(response.data.message);
+      setCodeStatus(response.data.isCodeSent);
     } catch (e: any) {
       console.error(e.message);
     }
   };
 
-  const getGroups = async () => {
+  const handleGetGroups = async () => {
     try {
       const response = await axios.post("http://localhost:3000/api/getGroups", {
         apiId: Number(apiId),
         apiHash: apiHash,
+        phoneNumber: phoneNumber,
+        code: code,
       });
 
       setGroupTitles(response.data.groupTitles);
       setGroupIds(response.data.groupIds);
-      console.log(groupTitles);
-      console.log(groupIds);
+      setCodeStatus(!response.data.isOnboarded);
+      setMessage(response.data.message);
     } catch (e: any) {
       console.error(e.message);
     }
@@ -96,7 +105,7 @@ function App() {
         Send Code
       </Button>
 
-      {message && (
+      {codeStatus && (
         <>
           <FormControl id="code" mt={4} mb={4} isRequired>
             <FormLabel>Code</FormLabel>
@@ -106,7 +115,7 @@ function App() {
               onChange={(e) => setCode(e.target.value)}
             />
           </FormControl>
-          <Button mt={4} colorScheme="teal" w="100%" onClick={getGroups}>
+          <Button mt={4} colorScheme="teal" w="100%" onClick={handleGetGroups}>
             Get Groups
           </Button>
         </>
